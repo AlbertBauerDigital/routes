@@ -63,14 +63,14 @@ class ExtbaseRouteResolver implements MiddlewareInterface
      */
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $request = $request->withAttribute('extbase', new ExtbaseRequestParameters());
-
+        $initalRequest = $request->withAttribute('extbase', new ExtbaseRequestParameters());
+        $request = clone($this->disableRouting($initalRequest));
         try {
             $this->apiHandler->handle($request);
         } catch (ResourceNotFoundException | NoConfigurationException $e) {
             // Usually thrown when requested api slug is not registered.
             // Like `/api/bla`
-            return $handler->handle($request);
+            return $handler->handle($initalRequest);
         } catch (PropagateResponseException $e) {
             // Might be thrown from custom user middlewares for redirects
             return $e->getResponse();
@@ -85,6 +85,17 @@ class ExtbaseRouteResolver implements MiddlewareInterface
         }
 
         return $this->apiHandler->generateResponse();
+    }
+    /**
+     * We unset routing attribute to prevent it from next middleware redirects/resolves
+     */
+    private function disableRouting(ServerRequestInterface $request): ServerRequestInterface
+    {
+        $request = $request->withoutAttribute('routing');
+
+        $GLOBALS['TYPO3_REQUEST'] = $request;
+
+        return $request;
     }
 
 }
